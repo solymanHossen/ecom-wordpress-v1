@@ -69,7 +69,8 @@ class NexMart_Cart {
             session_start();
         }
         
-        if (!isset($_SESSION['nexmart_cart_id'])) {
+        // Generate or retrieve session cart ID
+        if (!isset($_SESSION['nexmart_cart_id']) || empty($_SESSION['nexmart_cart_id'])) {
             $_SESSION['nexmart_cart_id'] = wp_generate_uuid4();
         }
         
@@ -464,6 +465,11 @@ class NexMart_Cart {
     // AJAX Handlers
     
     public function ajax_add_to_cart() {
+        // Ensure session is started for guest users
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+            session_start();
+        }
+        
         // Verify nonce - but allow for cases where nonce verification fails for guests
         if (!wp_verify_nonce($_POST['nonce'] ?? '', 'nexmart_nonce')) {
             // Create a new nonce and continue - this handles page cache issues
@@ -503,10 +509,16 @@ class NexMart_Cart {
         ]);
     }
     
-    public function ajax_update_cart() {
+    public function ajax_update_cart_item() {
+        // Ensure session is started for guest users
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+            session_start();
+        }
+        
         // Verify nonce - relaxed for page caching compatibility
         if (!wp_verify_nonce($_POST['nonce'] ?? '', 'nexmart_nonce')) {
-            // Allow to continue
+            // Allow to continue but log it
+            error_log('Update cart: Nonce verification skipped for cached compatibility');
         }
         
         $cart_item_id = intval($_POST['cart_item_id'] ?? 0);
@@ -537,7 +549,13 @@ class NexMart_Cart {
     }
     
     public function ajax_get_cart() {
-        wp_send_json_success(['cart' => $this->get_cart()]);
+        // Ensure session is started for guest users
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
+            session_start();
+        }
+        
+        $cart = $this->get_cart();
+        wp_send_json_success(['cart' => $cart]);
     }
     
     public function ajax_apply_coupon() {

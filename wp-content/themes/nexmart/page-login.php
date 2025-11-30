@@ -197,11 +197,19 @@ document.getElementById('nexmart-login-form').addEventListener('submit', async (
     formData.append('nonce', nexmartObj.nonce);
     
     try {
-        const response = await fetch(nexmartObj.ajaxUrl, {
+        const response = await fetch(nexmartObj.ajaxurl, {
             method: 'POST',
             credentials: 'same-origin',
             body: formData
         });
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Non-JSON response:', text);
+            throw new Error('Server returned invalid response. Please try again.');
+        }
         
         const data = await response.json();
         

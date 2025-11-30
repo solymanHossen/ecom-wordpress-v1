@@ -182,7 +182,7 @@ window.NexMart = {
         if (typeof nexmartObj === 'undefined') {
             console.error('nexmartObj is not defined');
             this.showNotification('Configuration error. Please refresh the page.', 'error');
-            return;
+            return Promise.reject('Configuration error');
         }
         
         const formData = new FormData();
@@ -192,7 +192,7 @@ window.NexMart = {
         formData.append('attributes', JSON.stringify(attributes));
         formData.append('nonce', nexmartObj.nonce);
         
-        fetch(nexmartObj.ajaxurl, {
+        return fetch(nexmartObj.ajaxurl, {
             method: 'POST',
             body: formData,
             credentials: 'same-origin'
@@ -200,18 +200,26 @@ window.NexMart = {
         .then(res => res.json())
         .then(data => {
             console.log('Add to cart response:', data);
+            
             if (data.success) {
                 this.cart = data.data.cart;
                 this.updateCartUI();
                 this.showNotification('Product added to cart!', 'success');
-                this.openCartDrawer();
+                
+                // Auto-open cart drawer after adding
+                setTimeout(() => {
+                    this.openCartDrawer();
+                }, 300);
             } else {
-                this.showNotification(data.data?.message || 'Failed to add product', 'error');
+                throw new Error(data.data?.message || 'Failed to add to cart');
             }
+            
+            return data;
         })
         .catch(err => {
             console.error('Add to cart error:', err);
-            this.showNotification('An error occurred', 'error');
+            this.showNotification(err.message || 'Failed to add to cart', 'error');
+            throw err;
         });
     },
     
@@ -226,31 +234,50 @@ window.NexMart = {
         if (nexmartObj.cartCount) {
             document.querySelectorAll('.cart-count').forEach(badge => {
                 badge.textContent = nexmartObj.cartCount;
-                badge.classList.remove('hidden');
+                if (nexmartObj.cartCount > 0) {
+                    badge.classList.remove('hidden');
+                }
             });
         }
         
-        fetch(`${nexmartObj.ajaxurl}?action=nexmart_get_cart`, {
-            credentials: 'same-origin'
+        // Fetch fresh cart data from server
+        fetch(`${nexmartObj.ajaxurl}?action=nexmart_get_cart&nonce=${nexmartObj.nonce}`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
         })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return res.json();
+            })
             .then(data => {
                 console.log('Cart loaded:', data);
-                if (data.success) {
+                if (data.success && data.data && data.data.cart) {
                     this.cart = data.data.cart;
                     this.updateCartUI();
+                } else {
+                    console.warn('Cart response structure unexpected:', data);
                 }
             })
             .catch(err => {
                 console.error('Load cart error:', err);
+                // Still try to update UI with existing data
+                if (this.cart) {
+                    this.updateCartUI();
+                }
             });
     },
     
     // Update cart UI
     updateCartUI: function() {
         const itemCount = this.cart?.item_count || 0;
+        const items = this.cart?.items || [];
         
-        console.log('Updating cart UI, item count:', itemCount);
+        console.log('Updating cart UI, item count:', itemCount, 'items:', items.length);
         
         // Update cart count badges
         document.querySelectorAll('.cart-count').forEach(badge => {
@@ -264,7 +291,7 @@ window.NexMart = {
         
         // Update cart drawer if exists
         const cartItems = document.getElementById('cart-items');
-        if (cartItems && this.cart?.items) {
+        if (cartItems) {
             this.renderCartDrawer();
         }
     },
@@ -274,42 +301,54 @@ window.NexMart = {
         const container = document.getElementById('cart-items');
         const subtotalEl = document.getElementById('cart-drawer-subtotal');
         
-        if (!container || !this.cart) return;
+        if (!container) {
+            console.warn('Cart items container not found');
+            return;
+        }
         
-        if (this.cart.items.length === 0) {
+        // Check if cart and items exist
+        if (!this.cart || !this.cart.items || this.cart.items.length === 0) {
             container.innerHTML = `
                 <div class="flex flex-col items-center justify-center h-64 text-gray-400">
                     <i data-lucide="shopping-bag" class="w-16 h-16 mb-4"></i>
                     <p>Your cart is empty</p>
                 </div>
             `;
+            if (subtotalEl) {
+                subtotalEl.textContent = '$0.00';
+            }
             lucide.createIcons();
             return;
         }
         
         let html = '';
         this.cart.items.forEach(item => {
+            const itemImage = item.image || item.featured_image || 'https://via.placeholder.com/80';
+            const itemPrice = parseFloat(item.current_price || item.unit_price || item.price || 0);
+            const itemQty = parseInt(item.quantity || 1);
+            const lineTotal = itemPrice * itemQty;
+            
             html += `
-                <div class="flex gap-4 p-4 border-b" data-cart-id="${item.cart_id}">
-                    <img src="${item.image || 'https://via.placeholder.com/80'}" 
-                         alt="${item.name}" 
+                <div class="flex gap-4 p-4 border-b" data-cart-id="${item.cart_id || item.id}">
+                    <img src="${itemImage}" 
+                         alt="${item.name || 'Product'}" 
                          class="w-20 h-20 object-cover rounded-lg">
                     <div class="flex-1 min-w-0">
-                        <h4 class="font-semibold text-gray-900 truncate">${item.name}</h4>
-                        <p class="text-sm text-gray-500">$${item.current_price.toFixed(2)} × ${item.quantity}</p>
+                        <h4 class="font-semibold text-gray-900 truncate">${item.name || 'Product'}</h4>
+                        <p class="text-sm text-gray-500">$${itemPrice.toFixed(2)} × ${itemQty}</p>
                         <div class="flex items-center gap-2 mt-2">
-                            <button class="cart-qty-btn" data-action="decrease" data-cart-id="${item.cart_id}">
+                            <button class="cart-qty-btn w-6 h-6 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-100" data-action="decrease" data-cart-id="${item.cart_id || item.id}">
                                 <i data-lucide="minus" class="w-4 h-4"></i>
                             </button>
-                            <span class="w-8 text-center">${item.quantity}</span>
-                            <button class="cart-qty-btn" data-action="increase" data-cart-id="${item.cart_id}">
+                            <span class="w-8 text-center">${itemQty}</span>
+                            <button class="cart-qty-btn w-6 h-6 rounded border border-gray-300 flex items-center justify-center hover:bg-gray-100" data-action="increase" data-cart-id="${item.cart_id || item.id}">
                                 <i data-lucide="plus" class="w-4 h-4"></i>
                             </button>
                         </div>
                     </div>
                     <div class="text-right">
-                        <p class="font-bold text-gray-900">$${item.line_total.toFixed(2)}</p>
-                        <button class="text-red-500 hover:text-red-700 mt-2 cart-remove-btn" data-cart-id="${item.cart_id}">
+                        <p class="font-bold text-gray-900">$${lineTotal.toFixed(2)}</p>
+                        <button class="text-red-500 hover:text-red-700 mt-2 cart-remove-btn" data-cart-id="${item.cart_id || item.id}">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -318,6 +357,13 @@ window.NexMart = {
         });
         
         container.innerHTML = html;
+        
+        // Update subtotal
+        if (subtotalEl && this.cart.subtotal !== undefined) {
+            const subtotal = parseFloat(this.cart.subtotal || 0);
+            subtotalEl.textContent = '$' + subtotal.toFixed(2);
+        }
+        
         lucide.createIcons();
         
         // Update subtotal

@@ -370,8 +370,13 @@ class NexMart_Auth {
     // AJAX Handlers
     
     public function ajax_register() {
+        // Clean output buffer to prevent HTML before JSON
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        
         // Verify nonce (lenient for cached pages)
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'nexmart_nonce')) {
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'nexmart_nonce')) {
             error_log('Registration: Nonce verification failed, but continuing');
         }
         
@@ -384,31 +389,41 @@ class NexMart_Auth {
         // Validate required fields
         if (empty($data['email']) || empty($data['password'])) {
             wp_send_json_error(['message' => 'Email and password are required.']);
+            exit;
         }
         
         if (!is_email($data['email'])) {
             wp_send_json_error(['message' => 'Invalid email address.']);
+            exit;
         }
         
         if (strlen($data['password']) < 8) {
             wp_send_json_error(['message' => 'Password must be at least 8 characters.']);
+            exit;
         }
         
         $result = $this->register_user($data);
         
         if (is_wp_error($result)) {
             wp_send_json_error(['message' => $result->get_error_message()]);
+            exit;
         }
         
         wp_send_json_success([
             'message' => 'Account created successfully! Redirecting to login...',
             'redirect' => home_url('/login')
         ]);
+        exit;
     }
     
     public function ajax_login() {
+        // Clean output buffer to prevent HTML before JSON
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        
         // Verify nonce (lenient for cached pages)
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'nexmart_nonce')) {
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'nexmart_nonce')) {
             error_log('Login: Nonce verification failed, but continuing');
         }
         
@@ -419,12 +434,14 @@ class NexMart_Auth {
         // Validate required fields
         if (empty($email) || empty($password)) {
             wp_send_json_error(['message' => 'Email and password are required.']);
+            exit;
         }
         
         $result = $this->login_user($email, $password, $remember);
         
         if (is_wp_error($result)) {
             wp_send_json_error(['message' => $result->get_error_message()]);
+            exit;
         }
         
         // Determine redirect URL
@@ -438,6 +455,7 @@ class NexMart_Auth {
             'redirect' => $redirect,
             'user' => $result['user']
         ]);
+        exit;
     }
     
     public function ajax_logout() {
