@@ -142,6 +142,9 @@ function nexmart_scripts() {
 
     // Load Main Theme Script
     wp_enqueue_script( 'nexmart-main', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), time(), true );
+    
+    // Load Advanced Search Script
+    wp_enqueue_script( 'nexmart-advanced-search', get_template_directory_uri() . '/assets/js/advanced-search.js', array(), time(), true );
 
     // Pass PHP variables to JS
     wp_localize_script( 'nexmart-main', 'nexmartObj', array(
@@ -470,3 +473,68 @@ function nexmart_get_discount_badge($regular_price, $sale_price) {
     $discount = round((($regular_price - $sale_price) / $regular_price) * 100);
     return '<span class="absolute top-3 left-3 bg-rose-500 text-white text-xs font-bold px-2 py-1 rounded-full">' . $discount . '% OFF</span>';
 }
+
+/**
+ * AJAX Live Search Handler
+ * Modern implementation with multi-type search results
+ */
+function nexmart_ajax_live_search() {
+    // Verify nonce
+    check_ajax_referer('nexmart_nonce', 'nonce');
+    
+    global $wpdb;
+    $prefix = $wpdb->prefix . 'nexmart_';
+    
+    $query = isset($_POST['query']) ? sanitize_text_field($_POST['query']) : '';
+    
+    if (empty($query) || strlen($query) < 2) {
+        wp_send_json_error(['message' => 'Query too short']);
+        return;
+    }
+    
+    $search_param = '%' . $wpdb->esc_like($query) . '%';
+    
+    // Search Products (limit 5 for dropdown)
+    $products = $wpdb->get_results($wpdb->prepare(
+        "SELECT p.id, p.name, p.slug, p.price, p.sale_price, p.stock_quantity,
+            v.store_name as vendor_name,
+            (SELECT image_url FROM {$prefix}product_images WHERE product_id = p.id AND sort_order = 0 LIMIT 1) as primary_image
+        FROM {$prefix}products p 
+        LEFT JOIN {$prefix}vendors v ON p.vendor_id = v.id 
+        WHERE p.status = 'published' 
+            AND (p.name LIKE %s OR p.description LIKE %s OR p.sku LIKE %s)
+        ORDER BY p.sales_count DESC, p.created_at DESC 
+        LIMIT 5",
+        $search_param, $search_param, $search_param
+    ));
+    
+    // Search Categories (limit 3)
+    $categories = $wpdb->get_results($wpdb->prepare(
+        "SELECT c.id, c.name, c.slug,
+            (SELECT COUNT(*) FROM {$prefix}products WHERE category_id = c.id AND status = 'published') as product_count
+        FROM {$prefix}categories c 
+        WHERE c.name LIKE %s 
+        LIMIT 3",
+        $search_param
+    ));
+    
+    // Search Vendors (limit 3)
+    $vendors = $wpdb->get_results($wpdb->prepare(
+        "SELECT v.id, v.store_name, v.store_slug,
+            (SELECT COUNT(*) FROM {$prefix}products WHERE vendor_id = v.id AND status = 'published') as product_count
+        FROM {$prefix}vendors v 
+        WHERE v.status = 'active' 
+            AND (v.store_name LIKE %s OR v.store_description LIKE %s)
+        LIMIT 3",
+        $search_param, $search_param
+    ));
+    
+    wp_send_json_success([
+        'products' => $products,
+        'categories' => $categories,
+        'vendors' => $vendors,
+        'query' => $query
+    ]);
+}
+add_action('wp_ajax_nexmart_live_search', 'nexmart_ajax_live_search');
+add_action('wp_ajax_nopriv_nexmart_live_search', 'nexmart_ajax_live_search');
