@@ -1,0 +1,17 @@
+/*
+Theme Name: NexMart
+Theme URI: https://example.com/nexmart
+Author: AI Generator
+Author URI: https://example.com
+Description: An ultra-modern, multi-vendor marketplace theme inspired by AliExpress and Daraz, featuring glassmorphism, Tailwind CSS, and SaaS-style aesthetics.
+Version: 1.0.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: nexmart
+Tags: e-commerce, one-column, two-columns, right-sidebar, custom-colors, custom-menu, featured-images
+*/
+
+/* Core WordPress CSS adjustments */
+.alignwide { max-width: 100%; }
+.alignfull { max-width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); }
+img { height: auto; max-width: 100%; }
