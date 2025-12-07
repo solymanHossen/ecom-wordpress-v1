@@ -364,33 +364,60 @@ window.NexMart = {
             subtotalEl.textContent = '$' + subtotal.toFixed(2);
         }
         
+        // Re-initialize Lucide icons for the new elements
         lucide.createIcons();
         
-        // Update subtotal
-        if (subtotalEl) {
-            subtotalEl.textContent = '$' + this.cart.subtotal.toFixed(2);
-        }
+        // Bind events for quantity buttons (must be after HTML is set)
+        this.bindCartDrawerEvents();
+    },
+    
+    // Bind cart drawer events (separate function to be called after re-rendering)
+    bindCartDrawerEvents: function() {
+        const container = document.getElementById('cart-items');
+        if (!container) return;
         
-        // Bind events
+        // Remove any existing event listeners by cloning and replacing
         container.querySelectorAll('.cart-qty-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+        });
+        
+        container.querySelectorAll('.cart-remove-btn').forEach(btn => {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+        });
+        
+        // Add fresh event listeners
+        container.querySelectorAll('.cart-qty-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
                 const cartId = btn.dataset.cartId;
                 const action = btn.dataset.action;
-                const item = this.cart.items.find(i => i.cart_id == cartId);
+                const item = this.cart.items.find(i => i.cart_id == cartId || i.id == cartId);
+                
+                console.log('Cart qty button clicked:', action, 'cartId:', cartId, 'item:', item);
                 
                 if (item) {
                     let newQty = action === 'increase' ? item.quantity + 1 : item.quantity - 1;
+                    console.log('New quantity:', newQty);
+                    
                     if (newQty < 1) {
                         this.removeFromCart(cartId);
                     } else {
                         this.updateCartItem(cartId, newQty);
                     }
+                } else {
+                    console.error('Cart item not found:', cartId);
                 }
             });
         });
         
         container.querySelectorAll('.cart-remove-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 this.removeFromCart(btn.dataset.cartId);
             });
         });
@@ -398,6 +425,8 @@ window.NexMart = {
     
     // Update cart item
     updateCartItem: function(cartId, quantity) {
+        console.log('Updating cart item:', cartId, 'to quantity:', quantity);
+        
         const formData = new FormData();
         formData.append('action', 'nexmart_update_cart');
         formData.append('cart_item_id', cartId);
@@ -411,15 +440,26 @@ window.NexMart = {
         })
         .then(res => res.json())
         .then(data => {
+            console.log('Update cart response:', data);
             if (data.success) {
                 this.cart = data.data.cart;
                 this.updateCartUI();
+                this.showNotification('Cart updated', 'success');
+            } else {
+                console.error('Failed to update cart:', data);
+                this.showNotification(data.data?.message || 'Failed to update cart', 'error');
             }
+        })
+        .catch(err => {
+            console.error('Cart update error:', err);
+            this.showNotification('An error occurred', 'error');
         });
     },
     
     // Remove from cart
     removeFromCart: function(cartId) {
+        console.log('Removing cart item:', cartId);
+        
         const formData = new FormData();
         formData.append('action', 'nexmart_remove_from_cart');
         formData.append('cart_item_id', cartId);
@@ -432,11 +472,19 @@ window.NexMart = {
         })
         .then(res => res.json())
         .then(data => {
+            console.log('Remove from cart response:', data);
             if (data.success) {
                 this.cart = data.data.cart;
                 this.updateCartUI();
                 this.showNotification('Item removed from cart', 'success');
+            } else {
+                console.error('Failed to remove item:', data);
+                this.showNotification(data.data?.message || 'Failed to remove item', 'error');
             }
+        })
+        .catch(err => {
+            console.error('Remove from cart error:', err);
+            this.showNotification('An error occurred', 'error');
         });
     },
     
@@ -472,12 +520,12 @@ window.NexMart = {
                 e.stopPropagation();
                 
                 const productId = btn.dataset.productId;
-                this.toggleWishlist(productId, btn);
+                this.toggleWishlist(productId);
             });
         });
     },
     
-    toggleWishlist: function(productId, button) {
+    toggleWishlist: function(productId) {
         if (typeof nexmartObj === 'undefined') {
             console.error('nexmartObj is not defined');
             this.showNotification('Configuration error. Please refresh the page.', 'error');
@@ -496,9 +544,10 @@ window.NexMart = {
         })
         .then(res => res.json())
         .then(data => {
+            console.log('Wishlist toggle response:', data);
             if (data.success) {
-                button.classList.toggle('text-red-500', data.data.in_wishlist);
-                button.classList.toggle('fill-red-500', data.data.in_wishlist);
+                // Update ALL wishlist buttons for this product
+                this.updateWishlistUI(productId, data.data.in_wishlist);
                 this.showNotification(data.data.message, 'success');
             } else {
                 this.showNotification(data.data?.message || 'Please log in to add to wishlist', 'error');
@@ -508,6 +557,34 @@ window.NexMart = {
             console.error('Wishlist toggle error:', err);
             this.showNotification('An error occurred', 'error');
         });
+    },
+    
+    // Update all wishlist button UIs for a product
+    updateWishlistUI: function(productId, inWishlist) {
+        // Find all wishlist buttons for this product
+        document.querySelectorAll(`.wishlist-btn[data-product-id="${productId}"]`).forEach(btn => {
+            const icon = btn.querySelector('svg, i');
+            
+            if (inWishlist) {
+                // Add to wishlist - fill with red
+                btn.classList.add('text-red-500');
+                btn.classList.remove('text-gray-400');
+                if (icon) {
+                    icon.classList.add('fill-red-500');
+                    icon.style.fill = 'currentColor';
+                }
+            } else {
+                // Remove from wishlist - outline only
+                btn.classList.remove('text-red-500');
+                btn.classList.add('text-gray-400');
+                if (icon) {
+                    icon.classList.remove('fill-red-500');
+                    icon.style.fill = 'none';
+                }
+            }
+        });
+        
+        console.log(`Updated ${document.querySelectorAll(`.wishlist-btn[data-product-id="${productId}"]`).length} wishlist buttons for product ${productId}`);
     },
     
     // Product gallery

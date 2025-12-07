@@ -95,25 +95,30 @@ class NexMart_Cart {
         }
         
         // Check stock
-        if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
+        if ($product->stock_quantity !== null && intval($product->stock_quantity) < $quantity) {
             return new WP_Error('out_of_stock', 'Not enough stock available.');
         }
         
         $attributes_json = !empty($attributes) ? json_encode($attributes) : null;
         
         // Check if already in cart
-        $existing = $this->wpdb->get_row($this->wpdb->prepare(
-            "SELECT * FROM {$this->db->cart_table} 
-             WHERE session_id = %s AND product_id = %d 
-             AND (attributes = %s OR (attributes IS NULL AND %s IS NULL))",
-            $session_id, $product_id, $attributes_json, $attributes_json
-        ));
+        $sql = "SELECT * FROM {$this->db->cart_table} WHERE session_id = %s AND product_id = %d";
+        $params = [$session_id, $product_id];
+        
+        if ($attributes_json === null) {
+            $sql .= " AND attributes IS NULL";
+        } else {
+            $sql .= " AND attributes = %s";
+            $params[] = $attributes_json;
+        }
+        
+        $existing = $this->wpdb->get_row($this->wpdb->prepare($sql, $params));
         
         if ($existing) {
             $new_quantity = $existing->quantity + $quantity;
             
             // Check stock for new quantity
-            if ($product->stock_quantity !== null && $product->stock_quantity < $new_quantity) {
+            if ($product->stock_quantity !== null && intval($product->stock_quantity) < $new_quantity) {
                 return new WP_Error('out_of_stock', 'Not enough stock available.');
             }
             
@@ -157,7 +162,7 @@ class NexMart_Cart {
         }
         
         // Check stock
-        if ($item->stock_quantity !== null && $item->stock_quantity < $quantity) {
+        if ($item->stock_quantity !== null && intval($item->stock_quantity) < $quantity) {
             return new WP_Error('out_of_stock', 'Not enough stock available.');
         }
         
@@ -509,7 +514,7 @@ class NexMart_Cart {
         ]);
     }
     
-    public function ajax_update_cart_item() {
+    public function ajax_update_cart() {
         // Ensure session is started for guest users
         if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
             session_start();

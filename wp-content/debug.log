@@ -315,3 +315,19 @@ Stack trace:
 [30-Nov-2025 17:16:49 UTC] Getting cart for session ID: user_1
 [30-Nov-2025 17:16:49 UTC] Cart items found: 1
 [30-Nov-2025 17:53:10 UTC] PHP Notice:  session_start(): Ignoring session_start() because a session is already active (started from /var/www/html/ecommerce-wordpress/wp-content/themes/nexmart/functions.php on line 45) in phar:///usr/local/bin/wp/vendor/wp-cli/eval-command/src/Eval_Command.php(39) : eval()'d code on line 1
+[07-Dec-2025 17:00:42 UTC] Getting cart for session ID: 7f137594-d5e6-4b2a-9302-ae8002966181
+[07-Dec-2025 17:00:42 UTC] Cart items found: 0
+[07-Dec-2025 17:00:42 UTC] Getting cart for session ID: 7f137594-d5e6-4b2a-9302-ae8002966181
+[07-Dec-2025 17:00:42 UTC] Cart items found: 1
+[07-Dec-2025 17:00:42 UTC] Getting cart for session ID: 7f137594-d5e6-4b2a-9302-ae8002966181
+[07-Dec-2025 17:00:42 UTC] Cart items found: 2
+[07-Dec-2025 17:00:42 UTC] Getting cart for session ID: 7f137594-d5e6-4b2a-9302-ae8002966181
+[07-Dec-2025 17:00:42 UTC] Cart items found: 2
+[07-Dec-2025 17:01:52 UTC] Getting cart for session ID: d23ece20-8eb7-483f-8c4a-a8623647f99a
+[07-Dec-2025 17:01:52 UTC] Cart items found: 0
+[07-Dec-2025 17:01:52 UTC] Getting cart for session ID: d23ece20-8eb7-483f-8c4a-a8623647f99a
+[07-Dec-2025 17:01:52 UTC] Cart items found: 1
+[07-Dec-2025 17:01:52 UTC] Getting cart for session ID: d23ece20-8eb7-483f-8c4a-a8623647f99a
+[07-Dec-2025 17:01:52 UTC] Cart items found: 1
+[07-Dec-2025 17:01:52 UTC] Getting cart for session ID: d23ece20-8eb7-483f-8c4a-a8623647f99a
+[07-Dec-2025 17:01:52 UTC] Cart items found: 1

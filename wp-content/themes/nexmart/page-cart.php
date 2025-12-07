@@ -141,6 +141,9 @@ function renderCartItems(cart) {
         vendor.items.forEach(item => {
             const displayPrice = item.current_price || item.sale_price || item.price;
             const cartId = item.cart_id || item.id;
+            const stockQty = parseInt(item.stock_quantity || 9999);
+            const isMaxStock = item.quantity >= stockQty;
+            
             html += `
                 <div class="p-6 flex gap-4">
                     <div class="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
@@ -149,15 +152,18 @@ function renderCartItems(cart) {
                     <div class="flex-1">
                         <h3 class="font-semibold text-gray-900 mb-1">${item.name}</h3>
                         <p class="text-primary-600 font-bold">$${parseFloat(displayPrice).toFixed(2)}</p>
+                        ${isMaxStock ? '<p class="text-xs text-red-500 mt-1">Max stock reached</p>' : ''}
                     </div>
                     <div class="flex items-center gap-2">
-                        <button onclick="updateCartItem(${cartId}, ${item.quantity - 1})" class="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100">-</button>
+                        <button onclick="updateCartItem('${cartId}', ${item.quantity - 1})" class="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100">-</button>
                         <span class="w-8 text-center">${item.quantity}</span>
-                        <button onclick="updateCartItem(${cartId}, ${item.quantity + 1})" class="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100">+</button>
+                        <button onclick="updateCartItem('${cartId}', ${item.quantity + 1})" 
+                                class="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100 ${isMaxStock ? 'opacity-50 cursor-not-allowed' : ''}"
+                                ${isMaxStock ? 'disabled' : ''}>+</button>
                     </div>
                     <div class="text-right">
                         <p class="font-bold text-gray-900">$${(parseFloat(displayPrice) * item.quantity).toFixed(2)}</p>
-                        <button onclick="removeFromCart(${cartId})" class="text-red-500 text-sm hover:underline mt-1">Remove</button>
+                        <button onclick="removeFromCart('${cartId}')" class="text-red-500 text-sm hover:underline mt-1">Remove</button>
                     </div>
                 </div>
             `;
@@ -201,6 +207,8 @@ function updateCartItem(cartItemId, quantity) {
         if (data.success) {
             loadCart();
             updateCartCount();
+        } else {
+            alert(data.data.message || 'Error updating cart');
         }
     });
 }
@@ -247,11 +255,11 @@ function applyCoupon() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            msg.textContent = 'Coupon applied successfully!';
+            msg.textContent = data.data.message || 'Coupon applied successfully!';
             msg.className = 'text-sm mt-2 text-green-600';
             loadCart();
         } else {
-            msg.textContent = data.data || 'Invalid coupon code';
+            msg.textContent = (data.data && data.data.message) ? data.data.message : 'Invalid coupon code';
             msg.className = 'text-sm mt-2 text-red-600';
         }
         msg.classList.remove('hidden');
